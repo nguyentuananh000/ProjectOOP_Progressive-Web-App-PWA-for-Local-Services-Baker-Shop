@@ -16,6 +16,7 @@ protected:
     time_t lastLoginAt;
     bool twoFactorEnabled;
 public:
+    //Tạo một acc mới
     void registerAccount(string _name, string _email, string _phone, string _passwordHash, string _role) {
         if (_email.empty() || _phone.empty() || _passwordHash.empty() || _name.empty() || _role.empty()) {
             cout << "Registration failed: missing information.\n";
@@ -33,6 +34,7 @@ public:
         twoFactorEnabled = false;
         cout << "Registered successfully! UserID: " << userId << endl;
     }
+    // Đăng nhập
     void login(string identifier, string password) {
         if ((identifier == email || identifier == phone) && password == passwordHash) {
             lastLoginAt = time(nullptr);
@@ -41,6 +43,7 @@ public:
             cout << "Invalid login credentials.\n";
         }
     }
+    //Reset mật khẩu
     void resetPassword(string otp) {
         // Giả sử otp gửi về điện thoại hoặc email là 123456
         if(otp == "123456") {
@@ -54,6 +57,7 @@ public:
             cout<<"Invalid OTP.\n";
         }
     }
+    //Chỉnh sửa hồ sơ
     void updateProfile(string _name, string _email, string _phone, string _status) {
         if (!_name.empty()) name = _name;
         if (!_email.empty()) email = _email;
@@ -61,10 +65,12 @@ public:
         if (!_status.empty()) status = _status;
         cout << "Profile updated successfully.\n";
     }
+    //Bật xác thực 2 yếu tố
     void enable2FA() {
         twoFactorEnabled = true;
         cout << "Two-factor authentication enabled.\n";
     }
+    //Tắt xác thực 2 yếu tố
     void disable2FA() {
         twoFactorEnabled = false;
         cout << "Two-factor authentication disabled.\n";
