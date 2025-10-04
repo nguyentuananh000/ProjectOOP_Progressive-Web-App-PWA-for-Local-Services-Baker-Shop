@@ -3,8 +3,75 @@
 #include<vector>
 
 using namespace std;
+class User {
+protected:
+    string userId;
+    string name;
+    string email;
+    string phone;
+    string passwordHash;
+    string status;
+    string role;
+    time_t createdAt;
+    time_t lastLoginAt;
+    bool twoFactorEnabled;
+public:
+    void registerAccount(string _name, string _email, string _phone, string _passwordHash, string _role) {
+        if (_email.empty() || _phone.empty() || _passwordHash.empty() || _name.empty() || _role.empty()) {
+            cout << "Registration failed: missing information.\n";
+            return;
+        }
+        userId = "U" + to_string(rand() % 10000);
+        name = _name;
+        email = _email;
+        phone = _phone;
+        passwordHash = _passwordHash;
+        status = "active";
+        role = _role;
+        createdAt = time(nullptr);
+        lastLoginAt = time(nullptr);
+        twoFactorEnabled = false;
+        cout << "Registered successfully! UserID: " << userId << endl;
+    }
+    void login(string identifier, string password) {
+        if ((identifier == email || identifier == phone) && password == passwordHash) {
+            lastLoginAt = time(nullptr);
+            cout << "Login successful! Welcome back, " << name << endl;
+        } else {
+            cout << "Invalid login credentials.\n";
+        }
+    }
+    void resetPassword(string otp) {
+        // Giả sử otp gửi về điện thoại hoặc email là 123456
+        if(otp == "123456") {
+            cout<<"Enter new password: ";
+            string newPassword;
+            cin>>newPassword;
+            passwordHash = newPassword;
+            cout<<"Password reset successful!\n";
+        }
+        else {
+            cout<<"Invalid OTP.\n";
+        }
+    }
+    void updateProfile(string _name, string _email, string _phone, string _status) {
+        if (!_name.empty()) name = _name;
+        if (!_email.empty()) email = _email;
+        if (!_phone.empty()) phone = _phone;
+        if (!_status.empty()) status = _status;
+        cout << "Profile updated successfully.\n";
+    }
+    void enable2FA() {
+        twoFactorEnabled = true;
+        cout << "Two-factor authentication enabled.\n";
+    }
+    void disable2FA() {
+        twoFactorEnabled = false;
+        cout << "Two-factor authentication disabled.\n";
+    }
+};
 int main() {
-
-
+    
+    
     
 }
