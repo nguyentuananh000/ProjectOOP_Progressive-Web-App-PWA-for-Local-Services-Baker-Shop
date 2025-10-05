@@ -581,7 +581,7 @@ public:
         // Create transaction with the gateway
         PaymentTransaction txn(payment.getPaymentId(), amount, gatewayChoice);
         
-        // BR13: Sign and encrypt the request
+        //Sign and encrypt the request
         txn.signRequest();
         
         // Simulate gateway processing
@@ -1088,56 +1088,6 @@ public:
 };
 
 int main() {
-    srand(time(0));
-
-    // Danh sách sản phẩm (để Admin quản lý)
-    vector<Product*> productList;
-
-    // Danh sách user (tuỳ bạn dùng)
-    vector<User*> userList;
-
-    // Admin (dùng lại class Admin bạn đã có ở trên)
-    Admin admin(&productList, &userList);
-
-    // Tạo vài sản phẩm
-    admin.createProduct("P01","SKU01","Chocolate Cake","",50000,"",true,30,"C01");
-    admin.createProduct("P02","SKU02","Cheese Cake","",60000,"",true,30,"C02");
-    admin.updateProduct("P02", 65000, "C02", true);
-    admin.deleteProduct("P01"); // xóa mềm
-    admin.managePromotions("NEW10");
-    admin.applyPromotion("NEW10");
-
-    // Danh sách đơn
-    vector<Order> orderList;
-    Order o1; 
-    o1.orderId = "ORD01";
-    o1.customerId = "CUST01";
-    o1.status = "confirmed";   // giả lập: Admin đã xác nhận xong
-    orderList.push_back(o1);
-
-    // Staff
-    Staff baker(&orderList);
-
-    // Test 1: Claim order khi "confirmed"
-    baker.claimOrder("ORD01");          // ok
-    baker.viewWorkStatus();
-
-    // Test 2: Cập nhật "confirmed" -> "in_progress"
-    baker.updateOrderStatus("in_progress"); // ok
-
-    // Test 3: Cập nhật "in_progress" -> "finished"
-    baker.updateOrderStatus("finished");    // ok
-
-    // Test 4: Đánh dấu completed (chỉ khi "finished")
-    baker.markOrderCompleted();             // ok
-
-    // Test 5: Claim lại đơn đã completed (sẽ fail)
-    baker.claimOrder("ORD01");              // fail vì không còn "confirmed"
-
-    // In trạng thái đơn cuối
-    cout << "[CHECK] ORD01 final status: " << orderList[0].status << "\n";
-
-    // Dọn bộ nhớ sản phẩm cấp phát
-    for (int i = 0; i < (int)productList.size(); i++) delete productList[i];
+    
     return 0;
 }
