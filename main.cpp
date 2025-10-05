@@ -76,6 +76,8 @@ public:
         cout << "Two-factor authentication disabled.\n";
     }
 };
+
+//-----------------------------Product-----------------------------------//
 class Product {
 private:
     string productId;
