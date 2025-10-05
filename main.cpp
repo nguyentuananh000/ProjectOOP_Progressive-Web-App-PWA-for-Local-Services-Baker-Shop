@@ -263,6 +263,65 @@ public:
         currentOrderStatus = status;
         cout << "Order status updated to: " << status << endl;
     }
+    //Xem các mặt hàng
+    void browseProducts(vector<Product> products) {
+        if (products.empty()) {
+            cout << "No products available.\n";
+            return;
+        }
+        bool foundActive = false;
+        cout << "\n--- Product Catalog ---\n";
+        for (auto p : products) {
+            if (p.getIsActive()) {
+                p.displayInfo();
+                foundActive = true;
+            }
+        }
+        if (!foundActive)
+            cout << "No active products available.\n";
+    }
+    //Tìm mặt hàng
+    void searchProduct(vector<Product> products, string name) {
+        for(auto p: products) {
+            if(p.getName() == name) {
+                p.displayInfo();
+                return;
+            }
+        }
+        cout<<"No products found matching your search.\n";
+    }
+};
+//--------------------------------Guest---------------------//
+class GuestUser {
+private:
+    string sessionId; // Mã định danh tạm cho khách truy cập
+public:
+    // --- Constructor ---
+    GuestUser() {
+        sessionId = "G" + to_string(rand() % 10000);
+        cout << "Guest session started: " << sessionId << endl;
+    }
+    //Xem các mặt hàng
+    void browseProducts(vector<Product> products) {
+        if (products.empty()) {
+            cout << "No products available.\n";
+            return;
+        }
+        cout << "\n--- Product Catalog ---\n";
+        for (auto p : products) {
+            if (p.getIsActive()) {
+                p.displayInfo();
+            }
+        }
+        cout<<'\n';
+    }
+    //đăng kí trở thành Customer
+    Customer registerAsCustomer(string name, string email, string phone, string password) {
+        Customer newCustomer;
+        newCustomer.registerAccount(name, email, phone, password, "customer");
+        cout << "Welcome, " << name << "! Your customer account has been created.\n";
+        return newCustomer;
+    }
 };
 int main() {
     
