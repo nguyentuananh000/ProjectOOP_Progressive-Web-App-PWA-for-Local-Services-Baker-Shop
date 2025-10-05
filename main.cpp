@@ -1,7 +1,7 @@
-#include<iostream>
-#include<string>
-#include<vector>
-
+#include <iostream>
+#include <ctime>
+#include <vector>
+#include <map>
 using namespace std;
 class User {
 protected:
@@ -16,7 +16,7 @@ protected:
     time_t lastLoginAt;
     bool twoFactorEnabled;
 public:
-    //Tạo một acc mới
+    //Tạo một acc mới (hàm khởi tạo)
     void registerAccount(string _name, string _email, string _phone, string _passwordHash, string _role) {
         if (_email.empty() || _phone.empty() || _passwordHash.empty() || _name.empty() || _role.empty()) {
             cout << "Registration failed: missing information.\n";
@@ -76,8 +76,6 @@ public:
         cout << "Two-factor authentication disabled.\n";
     }
 };
-
-//-----------------------------Product-----------------------------------//
 class Product {
 private:
     string productId;
@@ -138,6 +136,24 @@ public:
     double getPrice() {
         return price;
     }
+    bool getIsActive() {
+        return isActive;
+    }
+    string getCategoryId() {
+        return categoryId;
+    }
+    void displayInfo() {
+        cout << "Product ID: " << productId << endl;
+        cout << "SKU: " << sku << endl;
+        cout << "Name: " << name << endl;
+        cout << "Description: " << description << endl;
+        cout << "Price: " << price << " VND" << endl;
+        cout << "Preparation Time: " << prepTime << " mins" << endl;
+        cout << "Category: " << categoryId << endl;
+        cout << "Image: " << imageUrl << endl;
+        cout << "Status: " << (isActive ? "Available" : "Discontinued") << endl;
+    }
+    
 };
 //-------------------Customer kế thừa từ User------------------------//
 
@@ -301,6 +317,7 @@ public:
         sessionId = "G" + to_string(rand() % 10000);
         cout << "Guest session started: " << sessionId << endl;
     }
+    
     //Xem các mặt hàng
     void browseProducts(vector<Product> products) {
         if (products.empty()) {
@@ -315,6 +332,7 @@ public:
         }
         cout<<'\n';
     }
+    
     //đăng kí trở thành Customer
     Customer registerAsCustomer(string name, string email, string phone, string password) {
         Customer newCustomer;
@@ -323,8 +341,7 @@ public:
         return newCustomer;
     }
 };
-int main() {
-    
-    
+int main()
+{
     
 }
