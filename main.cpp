@@ -76,7 +76,192 @@ public:
         cout << "Two-factor authentication disabled.\n";
     }
 };
+class Product {
+private:
+    string productId;
+    string sku;
+    string name;
+    string description;
+    double price;
+    string imageUrl;
+    bool isActive;
+    int prepTime;
+    string categoryId;
+    time_t createdAt;
+public:
+    Product(string _productId, string _sku, string _name, string _description,
+            double _price, string _imageUrl, bool _isActive,
+            int _prepTime, string _categoryId)
+    : productId(_productId), sku(_sku), name(_name), description(_description),
+    price(_price), imageUrl(_imageUrl), isActive(_isActive),
+    prepTime(_prepTime), categoryId(_categoryId)
+    {
+        createdAt = time(nullptr);
+    }
+    void setPrice(double newPrice) {
+        if (newPrice <= 0) {
+            cout << "Invalid price. Must be greater than zero.\n";
+            return;
+        }
+        price = newPrice;
+        cout << "Price updated to " << price << " VND.\n";
+    }
+    
+    
+    void assignCategory(string newCategoryId) {
+        if (newCategoryId.empty()) {
+            cout << "Invalid category ID.\n";
+            return;
+        }
+        categoryId = newCategoryId;
+        cout << "Product assigned to category: " << categoryId << endl;
+    }
+    
+    
+    void activate() {
+        isActive = true;
+        cout << "Product activated for sale.\n";
+    }
+    
+    void deactivate() {
+        isActive = false;
+        cout << "Product deactivated from sale.\n";
+    }
+    string getProductId() {
+        return productId;
+    }
+    string getName() {
+        return name;
+    }
+    double getPrice() {
+        return price;
+    }
+};
+//-------------------Customer kế thừa từ User------------------------//
 
+class Customer : public User {
+private:
+    string address;
+    int loyaltyPoints;
+    string defaultPaymentMethod;
+    vector<pair<Product, int>> cart;
+    string currentOrderStatus;
+public:
+    // Hàm khởi tạo
+    Customer() {
+        loyaltyPoints = 0;
+        defaultPaymentMethod = "Cash on Delivery";
+    }
+    //cập nhật địa chỉ
+    void updateAddress(string _address) {
+        address = _address;
+        cout << "Address added successfully!\n";
+    }
+    //
+    void setDefaultPaymentMethod() {
+        
+    }
+    //tính điểm tích luỹ
+    void earnPoints(int points) {
+        loyaltyPoints += points;
+        cout << "Earned " << points << " points. Total: " << loyaltyPoints << endl;
+    }
+    //quy đổi điểm tích luỹ
+    void redeemPoints(int points) {
+        if (points <= loyaltyPoints) {
+            loyaltyPoints -= points;
+            cout << "Redeemed " << points << " points. Remaining: " << loyaltyPoints << endl;
+        } else {
+            cout << "Not enough points to redeem.\n";
+        }
+    }
+    //thêm vào giỏ hàng
+    void addToCart(Product product, int quantity) {
+        if (quantity <= 0) {
+            cout << "Quantity must be greater than 0.\n";
+            return;
+        }
+        
+        // Nếu sản phẩm đã tồn tại trong giỏ, tăng số lượng
+        for (auto item : cart) {
+            if (item.first.getProductId() == product.getProductId()) {
+                item.second += quantity;
+                cout << "Updated quantity for " << product.getName()
+                << " to " << item.second << endl;
+                return;
+            }
+        }
+        
+        // Nếu chưa có, thêm sản phẩm mới
+        cart.push_back({product, quantity});
+        cout << "Added " << quantity << " x " << product.getName() << " to cart.\n";
+    }
+    //cập nhật số lượng vật phẩm
+    void updateCart(string productId, int newQuantity) {
+        for (auto item : cart) {
+            if (item.first.getProductId() == productId) {
+                if (newQuantity <= 0) {
+                    cout << "Invalid quantity. Use removeFromCart() to delete item.\n";
+                    return;
+                }
+                item.second = newQuantity;
+                cout << "Updated " << item.first.getName()
+                << " quantity to " << newQuantity << endl;
+                return;
+            }
+        }
+        cout << "Product not found in cart.\n";
+    }
+    //xoá vật phẩm trong giỏ hàng
+    void removeFromCart(string productId) {
+        for (auto it = cart.begin(); it != cart.end(); ++it) {
+            if (it->first.getProductId() == productId) {
+                cout << "Removed " << it->first.getName() << " from cart.\n";
+                cart.erase(it);
+                return;
+            }
+        }
+        cout << "Product not found in cart.\n";
+    }
+    //xem giỏ hàng
+    void viewCart() {
+        if (cart.empty()) {
+            cout << "Your cart is empty.\n";
+            return;
+        }
+        cout << "\n--- Your Cart ---\n";
+        double total = 0;
+        for (auto item : cart) {
+            double subTotal = item.first.getPrice() * item.second;
+            total += subTotal;
+            cout << item.first.getName() << " x " << item.second
+            << " → " << subTotal << " VND\n";
+        }
+        cout << "------------------\n";
+        cout << "Total: " << total << " VND\n";
+    }
+    //đặt hàng
+    void placeOrder(bool homeDelivery) {
+        if (cart.empty()) {
+            cout << "Cart is empty. Cannot place order.\n";
+            return;
+        }
+        earnPoints(10);
+        cart.clear();
+        currentOrderStatus = "Pending Confirmation";
+        cout << "Order placed successfully! Delivery: "
+        << (homeDelivery ? "Home Delivery" : "In-store Pickup") << endl;
+    }
+    //xem trạng thái đơn hàng
+    void trackOrder() {
+        cout << "Current order status: " << currentOrderStatus << endl;
+    }
+    //cập nhật trạng thái đơn hàng
+    void updateOrderStatus(string status) {
+        currentOrderStatus = status;
+        cout << "Order status updated to: " << status << endl;
+    }
+};
 int main() {
     
     
