@@ -341,6 +341,139 @@ public:
         return newCustomer;
     }
 };
+//-------------------------------- Admin kế thừa từ User ------------------------//
+class Admin : public User {
+private:
+    // trỏ tới danh sách sản phẩm dùng chung trong chương trình
+    vector<Product*>* product;  // lưu ý: tên biến là 'product' (như bạn dùng)
+public:
+    // constructor: cho phép truyền nullptr hoặc danh sách thật
+    explicit Admin(vector<Product*>* _product = nullptr) : product(_product) {
+        role = "admin"; // gán vai trò admin
+    }
+
+    void setProductList(vector<Product*>* _product) { product = _product; }
+
+    // Admin có thể thêm sản phẩm mới
+    void addProduct(const string& id, const string& sku, const string& name, double price) {
+        if (!product) {
+            cout << "Product list not initialized.\n";
+            return;
+        }
+        Product* newProduct = new Product(id, sku, name, "", price, "", true, 0, "");
+        product->push_back(newProduct);
+        cout << "[ADMIN] Product " << name << " added successfully.\n";
+    }
+
+    // Admin có thể xóa (deactivate) sản phẩm
+    void removeProduct(const string& productId) {
+        if (!product) return;
+        for (auto* p : *product) {
+            if (p->getProductId() == productId) {
+                p->deactivate();
+                cout << "[ADMIN] Product " << p->getName() << " deactivated successfully.\n";
+                return;
+            }
+        }
+        cout << "[ADMIN] Product not found.\n";
+    }
+
+    // Admin có thể cập nhật giá sản phẩm
+    void updateProductPrice(const string& productId, double newPrice) {
+        if (!product) return;
+        for (auto* p : *product) {
+            if (p->getProductId() == productId) {
+                p->setPrice(newPrice);
+                cout << "[ADMIN] Product " << p->getName()
+                     << " price updated to " << newPrice << " VND.\n";
+                return;
+            }
+        }
+        cout << "[ADMIN] Product not found.\n";
+    }
+
+    // Admin có thể xem tất cả sản phẩm
+    void viewAllProducts() const {
+        if (!product) return;
+        cout << "\n--- All Products ---\n";
+        for (auto* p : *product) {
+            p->displayInfo();
+        }
+        cout << '\n';
+    }
+
+    // Admin có thể chấp nhận / hủy đơn hàng (demo in ra màn hình)
+    void changeOrderStatus(const string& orderId, const string& newStatus) {
+        cout << "[ADMIN] Order " << orderId << " -> " << newStatus << "\n";
+    }
+    void cancelOrder(const string& orderId) {
+        cout << "[ADMIN] Order " << orderId << " canceled.\n";
+    }
+
+    // Admin có thể xem tất cả khách hàng đã đăng ký
+    void viewAllCustomers(const vector<Customer*>& customers) {
+        if (customers.empty()) {
+            cout << "No registered customers.\n";
+            return;
+        }
+        cout << "\n--- Registered Customers ---\n";
+        for (auto* c : customers) {
+            cout << "Customer Name: " << c->getName()
+                 << ", Email: " << c->getEmail()
+                 << ", Phone: " << c->getPhone() << '\n';
+        }
+        cout << '\n';
+    }
+};
+//------------------------------- Baker kế thừa từ User ------------------------//
+class Baker : public User {
+private:
+    string currentOrderId;
+    string workStatus; // "idle", "received", "baking", "finished"
+public:
+    Baker() {
+        currentOrderId = "";
+        workStatus = "idle";
+        role = "baker"; // gán vai trò baker
+    }
+
+    // Baker nhận đơn hàng mới
+    void receiveOrder(const string& orderId) {
+        currentOrderId = orderId;
+        workStatus = "received";
+        cout << "[BAKER] Received order " << orderId << endl;
+    }
+
+    // Baker bắt đầu nướng
+    void startBaking() {
+        if (workStatus != "received") {
+            cout << "[BAKER] No order ready to bake.\n";
+            return;
+        }
+        workStatus = "baking";
+        cout << "[BAKER] Baking started for " << currentOrderId << "...\n";
+    }
+
+    // Baker hoàn thành đơn hàng
+    void completeOrder() {
+        if (workStatus != "baking") {
+            cout << "[BAKER] No order to complete.\n";
+            return;
+        }
+        cout << "[BAKER] Completed baking order " << currentOrderId << endl;
+        workStatus = "finished";
+        // reset về idle (tuỳ bạn)
+        currentOrderId.clear();
+        workStatus = "idle";
+    }
+
+    void viewStatus() const {
+        cout << "[BAKER] Current: " << (currentOrderId.empty() ? "None" : currentOrderId)
+             << " | Status: " << workStatus << '\n';
+    }
+};
+
+
 int main()
 {
     
