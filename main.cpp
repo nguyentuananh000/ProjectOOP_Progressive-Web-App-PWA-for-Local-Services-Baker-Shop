@@ -2,6 +2,8 @@
 #include <ctime>
 #include <vector>
 #include <map>
+#include <string>
+#include <cstring>
 using namespace std;
 class User {
 protected:
@@ -344,31 +346,55 @@ public:
 
 
 //                    PAYMENT GATEWAY SYSTEM
-// Object: PaymentTransaction - Transaction details with the payment gateway
-class PaymentTransaction {
-private:
-    string txId;                    // Transaction identifier
-    string paymentId;               // Linked payment identifier
-    string gateway;                 // Payment gateway name (VNPay, MoMo, etc.)
-    string requestPayloadHash;      // Hashed request data for security (BR13)
-    string responseCode;            // Payment gateway response code
-    string responseMsg;             // Response message from the gateway
-    time_t tokenExpiry;             // Token expiration time
-    string signature;               // Digital signature for validation
-    double amount;                  // Transaction amount
-    time_t createdAt;               // Transaction creation time
+class PaymentBase {
+protected:  
+    string paymentId;       // Mã thanh toán
+    double amount;          // Số tiền
+    string currency;        
+    time_t createdAt;       // Thời gian tạo
     
-    // BR13: Simple encryption simulation (XOR cipher with key)
-    string encryptData(string data, int key = 42) const {
+public:
+    
+    PaymentBase() : paymentId(""), amount(0.0), currency("VND"), createdAt(0) {}
+    
+    PaymentBase(string id, double amt) 
+        : paymentId(id), amount(amt), currency("VND") {
+        createdAt = time(nullptr);
+    }
+    virtual void displayInfo() const {
+        cout << "Payment ID: " << paymentId << endl;
+        cout << "Amount: " << amount << " " << currency << endl;
+    }
+    
+    // Getters
+    string getPaymentId() const { return paymentId; }
+    double getAmount() const { return amount; }
+    string getCurrency() const { return currency; }
+    virtual ~PaymentBase() {}
+};
+   //PaymentTransaction
+class PaymentTransaction : public PaymentBase {
+private:
+    // Attributes riêng của PaymentTransaction
+    // paymentId, amount, currency đã kế thừa từ PaymentBase
+    string txId;                    
+    string gateway;                 
+    string requestPayloadHash;      
+    string responseCode;            
+    string responseMsg;             // response message from the gateway
+    time_t tokenExpiry;             // token expiration time
+    string signature;               // digital signature for validation
+    
+    //Simple encryption 
+    string encryptData(string data) {
         string encrypted = data;
         for (size_t i = 0; i < encrypted.length(); i++) {
-            encrypted[i] = encrypted[i] ^ key;
+            encrypted[i] = encrypted[i] ^ 42; 
         }
         return encrypted;
     }
-    
-    // Generate hash for security (simulation)
-    string generateHash(string data) const {
+    // Helper method: Generate hash
+    string generateHash(string data) {
         int hash = 0;
         for (char c : data) {
             hash = (hash * 31 + c) % 1000000;
@@ -377,139 +403,148 @@ private:
     }
 
 public:
+    // Constructor - gọi constructor của base class (PaymentBase)
     PaymentTransaction(string _paymentId, double _amount, string _gateway) 
-        : paymentId(_paymentId), amount(_amount), gateway(_gateway) {
+        : PaymentBase(_paymentId, _amount) {  // Inheritance: gọi constructor cha
         txId = "TX" + to_string(rand() % 100000);
-        createdAt = time(nullptr);
-        tokenExpiry = time(nullptr) + 3600; // 1 hour expiry
-        responseCode = "000"; // Pending
+        gateway = _gateway;
+        responseCode = "000"; 
         responseMsg = "Transaction initiated";
+        tokenExpiry = time(nullptr) + 3600; 
+        signature = "";
     }
     
-    // Method: signRequest() – generate digital signature for request
+    // Method 1: signRequest() – generate digital signature for request
     void signRequest() {
-        string data = txId + paymentId + gateway + to_string(amount);
+        string data = txId + paymentId + gateway;
         signature = generateHash(data);
         
-        // BR13: Encrypt the request payload
+        // BR: All transactions must be encrypted
         requestPayloadHash = encryptData(data);
         
         cout << "Request signed with signature: " << signature << endl;
-        cout << "BR13: Request payload encrypted"<<endl;
+        cout << "BR: Request payload encrypted" << endl;
     }
     
-    // Method: validateSignature() – verify response signature
-    bool validateSignature(string receivedSignature) const {
+    // Method 2: validateSignature() – verify response signature
+    bool validateSignature(string receivedSignature) {
         if (receivedSignature == signature) {
-            cout << "Signature validated successfully"<<endl;
+            cout << "Signature validated successfully" << endl;
             return true;
         } else {
-            cout << "Signature validation failed - Security breach detected!"<<endl;
+            cout << "Signature validation failed!" << endl;
             return false;
         }
     }
     
-    // Method: isTokenValid() – check token validity
-    bool isTokenValid() const {
-        time_t currentTime = time(nullptr);
-        if (currentTime <= tokenExpiry) {
-            cout << "Token is valid (expires in " 
-                 << (tokenExpiry - currentTime) << " seconds)"<<endl;;
+    // Method 3: isTokenValid() – check token validity
+    bool isTokenValid() {
+        time_t now = time(nullptr);
+        if (now <= tokenExpiry) {
+            cout << "Token is valid" << endl;
             return true;
         } else {
-            cout << "Token has expired!"<<endl;
+            cout << "Token has expired!" << endl;
             return false;
         }
     }
+    
+    // Getters
+    string getTxId() const { return txId; }
+    string getResponseCode() const { return responseCode; }
+    string getResponseMsg() const { return responseMsg; }
+    string getSignature() const { return signature; }
     
     // Setters
     void setResponseCode(string code) { responseCode = code; }
     void setResponseMsg(string msg) { responseMsg = msg; }
     
-    // Getters
-    string getTxId() const { return txId; }
-    string getPaymentId() const { return paymentId; }
-    string getGateway() const { return gateway; }
-    string getResponseCode() const { return responseCode; }
-    string getResponseMsg() const { return responseMsg; }
-    double getAmount() const { return amount; }
-    string getSignature() const { return signature; }
-    void displayTransaction() const {
-        cout << "--- Transaction Details ---"<<endl;
+    // Override displayInfo() từ base class
+    void displayInfo() const override {
+        PaymentBase::displayInfo(); // Gọi method của class cha
+        cout << "[Thông tin riêng của PaymentTransaction]:" << endl;
         cout << "TX ID: " << txId << endl;
-        cout << "Payment ID: " << paymentId << endl;
         cout << "Gateway: " << gateway << endl;
-        cout << "Amount: " << amount << " VND"<<endl;
-        cout << "Response Code: " << responseCode << endl;
-        cout << "Response Msg: " << responseMsg << endl;
+    }
+    
+    // Display transaction details
+    void displayTransaction() const {
+        cout << "\nTransaction Details" << endl;
+        cout << "TX ID: " << txId << endl;
+        cout << "Payment ID: " << paymentId <<endl;
+        cout << "Gateway: " << gateway << endl;
+        cout << "Amount: " << amount << " " << currency <<endl;
+        cout << "Response: " << responseCode << " - " << responseMsg << endl;
         cout << "Signature: " << signature << endl;
-        cout << "Token Valid: " << (isTokenValid() ? "YES" : "NO") << endl;
-        cout << "---------------------------\n";
     }
 };
-
-// Object: Payment - Payment for an order (card, wallet, or cash)
-class Payment {
+   //Payment - Thanh toán cho đơn hàng (card, wallet, or cash)
+   //KẾ THỪA từ PaymentBase (Inheritance)
+class Payment : public PaymentBase {
 private:
-    string paymentId;           // Payment identifier
-    string orderId;             // Linked order identifier
-    string method;              // Payment method (card, eWallet, cash)
-    double amount;              // Payment amount
-    string currency;            // Currency used (e.g., VND)
-    string status;              // Payment status (pending, success, failed)
-    time_t initiatedAt;         // Payment initiation time
-    time_t confirmedAt;         // Payment confirmation time
-    PaymentTransaction* transaction; // Associated transaction
-public:
-    Payment() : transaction(nullptr) {}
+    // Attributes riêng của Payment (thêm vào kế thừa)
+    // paymentId, amount, currency, createdAt đã kế thừa từ PaymentBase
+    string orderId;            // linked order identifier
+    string method;             // payment method (card, eWallet, cash)
+    string status;             // payment status (pending, success, failed)
+    time_t initiatedAt;        // payment initiation time
+    time_t confirmedAt;        // payment confirmation time
     
-    // Method: initiate(orderId, amount, method) – initiate payment
+    PaymentTransaction* transaction; // Pointer to transaction (relationship)
+
+public:
+    Payment() : PaymentBase() {
+        orderId = "";
+        method = "";
+        status = "pending";
+        initiatedAt = 0;
+        confirmedAt = 0;
+        transaction = nullptr;
+    }
+    
+    
+    // Method 1: initiate(orderId, amount, method) – initiate payment
     void initiate(string _orderId, double _amount, string _method) {
-        if (_amount <= 0) {
-            cout << "Invalid amount. Payment cannot be initiated."<<endl;
-            return;
-        }
         paymentId = "PAY" + to_string(rand() % 100000);
         orderId = _orderId;
         amount = _amount;
         method = _method;
-        currency = "VND";
         status = "pending";
         initiatedAt = time(nullptr);
         confirmedAt = 0;
-        cout<<"Payment Detail"<<endl;
+        
+        cout << "Payment Initiated"<< endl;
         cout << "Payment ID: " << paymentId << endl;
         cout << "Order ID: " << orderId << endl;
-        cout << "Method: " << method << endl;
         cout << "Amount: " << amount << " " << currency << endl;
+        cout << "Method: " << method << endl;
         cout << "Status: " << status << endl;
     }
     
-    // Method: confirm(gatewayResponse) – confirm payment from gateway
+    // Method 2: confirm(gatewayResponse) – confirm payment from gateway
     bool confirm(PaymentTransaction& txn) {
-        cout << "Confirming Payment"<<endl;
+        cout << "Confirming Payment" << endl;
         
-        // Validate token
+        // Check token validity
         if (!txn.isTokenValid()) {
             status = "failed";
-            cout << "Payment failed: Token expired\n";
+            cout << "Payment failed: Token expired" << endl;
             return false;
         }
         
         // Validate signature
         if (!txn.validateSignature(txn.getSignature())) {
             status = "failed";
-            cout << "Payment failed: Invalid signature"<<endl;
+            cout << "Payment failed: Invalid signature" << endl;
             return false;
         }
         
-        // Check response code
-        if (txn.getResponseCode() == "000" || txn.getResponseCode() == "00") {
+        // Check response code from gateway
+        if (txn.getResponseCode() == "00" || txn.getResponseCode() == "000") {
             status = "success";
             confirmedAt = time(nullptr);
             transaction = &txn;
-            cout << "Payment confirmed successfully!\n";
-            cout << "Confirmed at: " << ctime(&confirmedAt);
+            cout << "Payment confirmed successfully!" << endl;
             return true;
         } else {
             status = "failed";
@@ -518,25 +553,53 @@ public:
         }
     }
     
-    // Method: refund(amount, reason) – issue refund (BR14)
+    // Method 3: refund(amount, reason) – issue refund
+    // BR: Failed or canceled payments must be refunded within 3 business days
     void refund(double refundAmount, string reason) {
         if (status != "success") {
-            cout << "Cannot refund: Payment not successful"<<endl;
-            return;
-        }
-        if (refundAmount > amount) {
-            cout << "Refund amount exceeds payment amount"<<endl;
+            cout << "Cannot refund: Payment not successful" << endl;
             return;
         }
         
-        cout << "Initiating Refund"<<endl;
+        if (refundAmount > amount) {
+            cout << "Cannot refund: Amount exceeds payment amount" << endl;
+            return;
+        }
+        
+        cout << "Initiating Refund" << endl;
         cout << "Payment ID: " << paymentId << endl;
-        cout << "Original Amount: " << amount << " " << currency << endl;
         cout << "Refund Amount: " << refundAmount << " " << currency << endl;
         cout << "Reason: " << reason << endl;
-        cout << "Refund will be processed within 3 business days (BR14)"<<endl;
+        cout << "BR: Refund will be processed within 3 business days" << endl;
+        
         status = "refunded";
-        cout << "Status updated to: " << status << endl;   
+        cout << "Status updated to: refunded" << endl;
+    }
+    
+    //displayInfo() từ base class
+    void displayInfo() const override {
+        cout << "\n[Kế thừa từ PaymentBase]:" << endl;
+        PaymentBase::displayInfo(); // Gọi method của class cha
+        cout << "[Thông tin riêng của Payment]:" << endl;
+        cout << "Order ID: " << orderId << endl;
+        cout << "Method: " << method << endl;
+        cout << "Status: " << status << endl;
+    }
+    
+    // Display payment details
+    void displayPayment() const {
+        cout << "\n=== Payment Details ===" << endl;
+        cout << "Payment ID: " << paymentId << " (inherited)" << endl;
+        cout << "Order ID: " << orderId << endl;
+        cout << "Method: " << method << endl;
+        cout << "Amount: " << amount << " " << currency << " (inherited)" << endl;
+        cout << "Status: " << status << endl;
+        if (initiatedAt > 0) {
+            cout << "Initiated at: " << ctime(&initiatedAt);
+        }
+        if (confirmedAt > 0) {
+            cout << "Confirmed at: " << ctime(&confirmedAt);
+        }
     }
     
     // Getters
@@ -545,137 +608,146 @@ public:
     string getMethod() const { return method; }
     double getAmount() const { return amount; }
     string getStatus() const { return status; }
-    void displayPayment() const {
-        cout << "Payment Details"<<endl;
-        cout << "Payment ID: " << paymentId << endl;
-        cout << "Order ID: " << orderId << endl;
-        cout << "Method: " << method << endl;
-        cout << "Amount: " << amount << " " << currency << endl;
-        cout << "Status: " << status << endl;
-        cout << "Initiated: " << ctime(&initiatedAt);
-        if (confirmedAt > 0) {
-            cout << "Confirmed: " << ctime(&confirmedAt);
-        }
-    }
 };
-// Central gateway to manage all payment transactions
+/* ========================================================================
+   Payment Gateway - Cổng thanh toán xử lý giao dịch
+   FR: Connect with payment gateway to process transactions
+   FR: Display payment results (success/failure)
+   ======================================================================== */
 class PaymentGateway {
 private:
     string gatewayName;
     vector<Payment> payments;
-    vector<PaymentTransaction> transactions;   
+    vector<PaymentTransaction> transactions;
+    
 public:
+    // Constructor
     PaymentGateway(string name) : gatewayName(name) {
-        cout <<"Payment Gateway Initialized\n";
-        cout << name;
-        for (int i = name.length(); i < 35; i++)
-        cout <<"Encryption Enabled\n";
-        cout << "BR14: 3-Day Refund Policy\n";
+        cout << "Payment Gateway: " << name << endl;
+        cout << "BR: All transactions will be encrypted" << endl;
+        cout << "BR: 3-Day Refund Policy Active" << endl;
     }
     
-    // FR13: Connect with the payment gateway to process transactions
-    Payment processTransaction(string orderId, double amount, string method, string gatewayChoice) {
+    // FR: Process transaction through gateway
+    Payment processTransaction(string orderId, double amount, string method) {
+        cout << "PROCESSING TRANSACTION" << endl;
+        
+        // Create payment
         Payment payment;
         payment.initiate(orderId, amount, method);
         
-        // Create transaction with the gateway
-        PaymentTransaction txn(payment.getPaymentId(), amount, gatewayChoice);
+        // Create transaction with gateway
+        PaymentTransaction txn(payment.getPaymentId(), amount, gatewayName);
         
-        //Sign and encrypt the request
+        // Sign request (BR: must be encrypted)
         txn.signRequest();
         
         // Simulate gateway processing
-        cout << "Connecting to " << gatewayChoice << "...\n";
-        cout << "Processing transaction...\n";
+        cout << "\nConnecting to " << gatewayName << "..." << endl;
+        cout << "Processing..." << endl;
         
-        // Simulate random success/failure (85% success rate)
+        // Simulate response (90% success rate)
         int result = rand() % 100;
-        
-        if (result < 85) {
+        if (result < 90) {
             txn.setResponseCode("00");
             txn.setResponseMsg("Transaction successful");
-            cout << "✓ Gateway response: SUCCESS\n";
         } else {
             txn.setResponseCode("05");
-            txn.setResponseMsg("Insufficient funds");
-            cout << "✗ Gateway response: FAILED\n";
+            txn.setResponseMsg("Transaction failed");
         }
         
         // Confirm payment
-        bool confirmed = payment.confirm(txn);
+        bool success = payment.confirm(txn);
         
-        // Store payment and transaction
+        // Store records
         payments.push_back(payment);
         transactions.push_back(txn);
         
-        // FR14: Display payment results
-        displayPaymentResult(payment, txn, confirmed);
+        // FR: Display payment results
+        displayPaymentResult(payment, txn, success);
         
-        // BR14: If failed, initiate refund
-        if (!confirmed && method != "Cash on Delivery") {
-            payment.refund(amount, "Transaction failed - automatic refund");
+        // BR: Auto-refund if failed
+        if (!success && method != "Cash") {
+            payment.refund(amount, "Transaction failed - auto refund");
         }
         
         return payment;
     }
     
-    // FR14: Display payment results (success/failure)
+    // FR: Display payment results (success/failure)
     void displayPaymentResult(const Payment& payment, const PaymentTransaction& txn, bool success) {
-        cout << "\n";
-        
+        cout << "PAYMENT RESULT" << endl;
         if (success) {
-            cout << "PAYMENT SUCCESSFUL\n";
+            cout << "PAYMENT SUCCESSFUL" << endl;
         } else {
-            cout << "PAYMENT FAILED\n";
+            cout << "PAYMENT FAILED" << endl;
         }
         payment.displayPayment();
         txn.displayTransaction();
     }
     
-    // Refund a specific payment
-    void refundPayment(string paymentId, double amount, string reason) {
-        for (auto& payment : payments) {
-            if (payment.getPaymentId() == paymentId) {
-                payment.refund(amount, reason);
-                return;
-            }
-        }
-        cout << "Payment not found.\n";
-    }
-    
     // List all payments
     void listAllPayments() const {
         if (payments.empty()) {
-            cout << "No payments found.\n";
+            cout << "\nNo payments found." << endl;
             return;
         }
-        cout << "PAYMENT HISTORY\n";        
-        for (const auto& payment : payments) {
-            cout << "Payment: " << payment.getPaymentId() 
-                 << "Order: " << payment.getOrderId()
-                 << "Status: " << payment.getStatus()
-                 << "Amount: " << payment.getAmount() << " VND\n";
+        cout << "PAYMENT HISTORY" << endl;
+        for (size_t i = 0; i < payments.size(); i++) {
+            cout << "\n[Payment #" << (i+1) << "]";
+            payments[i].displayPayment();
         }
     }
 };
 
-// Object: Delivery - Simplified delivery tracking
-class Delivery {
+//                    DELIVERY SYSTEM
+class DeliveryBase {
+protected:  
+    string deliveryId;      // Mã giao hàng
+    string orderId;         // Mã đơn hàng
+    string status;          // Trạng thái giao hàng
+    time_t createdAt;       // Thời gian tạo
+    
+public:
+    DeliveryBase() : deliveryId(""), orderId(""), status("pending"), createdAt(0) {}
+    DeliveryBase(string delId, string ordId) 
+        : deliveryId(delId), orderId(ordId), status("pending") {
+        createdAt = time(nullptr);
+    }
+    
+    virtual void displayInfo() const {
+        cout << "\n--- Delivery Information ---" << endl;
+        cout << "Delivery ID: " << deliveryId << endl;
+        cout << "Order ID: " << orderId << endl;
+        cout << "Status: " << status << endl;
+    }
+    
+    // Getters
+    string getDeliveryId() const { return deliveryId; }
+    string getOrderId() const { return orderId; }
+    string getStatus() const { return status; }
+    
+    // Virtual destructor cho base class
+    virtual ~DeliveryBase() {}
+};
+
+   //KẾ THỪA từ DeliveryBase (Inheritance)
+class Delivery : public DeliveryBase {
 private:
-    string deliveryId;              
-    string orderId;                 
+    
+    // deliveryId, orderId, status, createdAt đã kế thừa từ DeliveryBase
     string courierPartnerId;        // BR15: one courier at a time
-    string status;                  // pending, assigned, confirmed, out_for_delivery, delivered
-    time_t createdAt;               
+    // status đã kế thừa từ DeliveryBase
     time_t assignedAt;              
     time_t confirmedAt;             // BR16: within 5 minutes
     bool isConfirmedWithin5Min;
     
 public:
-    Delivery(string _orderId) : orderId(_orderId), status("pending"),
+    // Constructor - Gọi constructor của base class (Constructor chaining)
+    Delivery(string _orderId) 
+        : DeliveryBase("DEL" + _orderId.substr(3), _orderId),  // Gọi base constructor
           isConfirmedWithin5Min(false), courierPartnerId(""), assignedAt(0), confirmedAt(0) {
-        deliveryId = "DEL" + orderId.substr(3);
-        createdAt = time(0);
+        // deliveryId, orderId, status, createdAt đã được khởi tạo ở base class
         cout << "Delivery created: " << deliveryId << endl;
     }
     
@@ -761,23 +833,36 @@ public:
         }
     }
     
-    // Getters
-    string getDeliveryId() const { return deliveryId; }
-    string getOrderId() const { return orderId; }
-    string getStatus() const { return status; }
+    // OVERRIDE method từ base class - Thể hiện tính đa hình (Polymorphism)
+    void displayInfo() const override {
+        cout << "\n--- Delivery Details ---" << endl;
+        cout << "Delivery ID: " << deliveryId << endl;
+        cout << "Order ID: " << orderId << endl;
+        cout << "Status: " << status << endl;
+        cout << "Courier Partner: " << (courierPartnerId.empty() ? "Not assigned" : courierPartnerId) << endl;
+        cout << "Confirmed within 5 min: " << (isConfirmedWithin5Min ? "Yes" : "No") << endl;
+    }
+    
+    // Getters (một số getter đã có ở base class)
     string getCourierPartnerId() const { return courierPartnerId; }
     bool getIsConfirmedWithin5Min() const { return isConfirmedWithin5Min; }
 };
-
-// delivery partner
-class DeliveryPartner {
+  
+   //KẾ THỪA từ DeliveryBase
+class DeliveryPartner : public DeliveryBase {
 private:
-    string partnerId;               
-    string name;                    
+    // deliveryId, orderId, status, createdAt đã kế thừa từ DeliveryBase
+    string partnerId;
+    string name;
     bool isAvailable;
+    
 public:
+    // Constructor - Gọi constructor của base class
     DeliveryPartner(string _partnerId, string _name)
-        : partnerId(_partnerId), name(_name), isAvailable(true) {
+        : DeliveryBase(_partnerId + "_DEL", ""),  // Gọi base constructor
+          partnerId(_partnerId), name(_name), isAvailable(true) {
+        // deliveryId được tạo từ partnerId
+        status = "available";  // Status cho courier
         cout << "Courier registered: " << name << endl;
     }
     // Accept a delivery assignment
@@ -813,11 +898,12 @@ public:
         delivery.markDelivered();
     }
 
-    // Display courier information
-    void displayInfo() const {
-        cout << "COURIER INFO";
-        cout << "ID: " << partnerId << endl;
+    // OVERRIDE method từ base class - Thể hiện tính đa hình (Polymorphism)
+    void displayInfo() const override {
+        cout << "\n--- Courier Partner Info ---" << endl;
+        cout << "Partner ID: " << partnerId << endl;
         cout << "Name: " << name << endl;
+        cout << "Status: " << status << endl;
         cout << "Available: " << (isAvailable ? "YES" : "NO") << endl;
     }
     
@@ -1088,6 +1174,5 @@ public:
 };
 
 int main() {
-    
     return 0;
 }
