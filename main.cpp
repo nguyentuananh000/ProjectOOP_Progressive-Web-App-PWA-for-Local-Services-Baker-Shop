@@ -50,11 +50,22 @@ public:
     void enable2FA() { twoFactorEnabled = true; cout << "Two-factor authentication enabled.\n"; }
     void disable2FA() { twoFactorEnabled = false; cout << "Two-factor authentication disabled.\n"; }
 
+    virtual void displayInfo() {
+        cout << "User ID: " << userId << endl;
+        cout << "Name: " << name << endl;
+        cout << "Email: " << email << endl;
+        cout << "Phone: " << phone << endl;
+        cout << "Role: " << role << endl;
+        cout << "Status: " << status << endl;
+        cout << "Created At: " << (createdAt ? ctime(&createdAt) : string("N/A\n"));
+        cout << "Last Login At: " << (lastLoginAt ? ctime(&lastLoginAt) : string("N/A\n"));
+        cout << "2FA: " << (twoFactorEnabled ? "Enabled" : "Disabled") << endl;
+    }
+
     string getName() { return name; }
     string getRole() { return role; }
 };
 
-//---------------- Product ----------------//
 class Product {
 private:
     string productId;
@@ -78,9 +89,10 @@ public:
         cout << "Description: " << description << endl;
         cout << "Status: " << (isActive ? "Available" : "Unavailable") << endl;
     }
+private:
+    string description;
 };
 
-//---------------- Customer ----------------//
 class Customer : public User {
 private:
     string address;
@@ -187,9 +199,16 @@ public:
             if (p.getName() == name) { p.displayInfo(); return; }
         cout << "No product found.\n";
     }
+
+    void displayInfo() override {
+        User::displayInfo();
+        cout << "Address: " << (address.empty() ? "N/A" : address) << endl;
+        cout << "Loyalty Points: " << loyaltyPoints << endl;
+        cout << "Current Order: " << (currentOrderStatus.empty() ? "None" : currentOrderStatus) << endl;
+        cout << "Cart Items: " << cart.size() << endl;
+    }
 };
 
-//---------------- Guest ----------------//
 class Guest {
 private:
     string sessionId;
@@ -216,6 +235,10 @@ public:
         newCustomer.registerAccount(name, email, phone, password, "customer");
         cout << "Welcome " << name << "! You are now a registered customer.\n";
         return newCustomer;
+    }
+
+    void displayInfo() {
+        cout << "Guest Session ID: " << sessionId << endl;
     }
 };
 
