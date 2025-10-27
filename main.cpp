@@ -89,8 +89,6 @@ public:
         cout << "Description: " << description << endl;
         cout << "Status: " << (isActive ? "Available" : "Unavailable") << endl;
     }
-private:
-    string description;
 };
 
 class Customer : public User {
