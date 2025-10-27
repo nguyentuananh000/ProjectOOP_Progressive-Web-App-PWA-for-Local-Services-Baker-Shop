@@ -3,7 +3,10 @@
 #include <string>
 #include <ctime>
 #include <cstdlib>
+#include <utility>
 using namespace std;
+
+class Product;
 
 class User {
 protected:
@@ -25,11 +28,11 @@ public:
         twoFactorEnabled = false;
         status = "inactive";
     }
-
+    
     virtual bool registerAccount(string _name, string _email, string _phone, string _password, string _role) = 0;
     virtual void login(string identifier, string password) = 0;
-
-    virtual void resetPassword(string otp) {
+    
+    void resetPassword(string otp) {
         if (otp == "123456") {
             string newPassword;
             cout << "Enter new password: ";
@@ -38,19 +41,26 @@ public:
             cout << "Password reset successful.\n";
         } else cout << "Invalid OTP.\n";
     }
-
-    virtual void updateProfile(string _name, string _email, string _phone, string _status) {
+    
+    void updateProfile(string _name, string _email, string _phone, string _status) {
         if (!_name.empty()) name = _name;
         if (!_email.empty()) email = _email;
         if (!_phone.empty()) phone = _phone;
         if (!_status.empty()) status = _status;
         cout << "Profile updated successfully.\n";
     }
-
-    void enable2FA() { twoFactorEnabled = true; cout << "Two-factor authentication enabled.\n"; }
-    void disable2FA() { twoFactorEnabled = false; cout << "Two-factor authentication disabled.\n"; }
-
-    virtual void displayInfo() {
+    
+    void enable2FA() {
+        twoFactorEnabled = true;
+        cout << "Two-factor authentication enabled.\n";
+    }
+    
+    void disable2FA() {
+        twoFactorEnabled = false;
+        cout << "Two-factor authentication disabled.\n";
+    }
+    
+    virtual void displayInfo() const {
         cout << "User ID: " << userId << endl;
         cout << "Name: " << name << endl;
         cout << "Email: " << email << endl;
@@ -61,9 +71,9 @@ public:
         cout << "Last Login At: " << (lastLoginAt ? ctime(&lastLoginAt) : string("N/A\n"));
         cout << "2FA: " << (twoFactorEnabled ? "Enabled" : "Disabled") << endl;
     }
-
-    string getName() { return name; }
-    string getRole() { return role; }
+    
+    string getName() const { return name; }
+    string getRole() const { return role; }
 };
 
 class Product {
@@ -73,21 +83,23 @@ private:
     string description;
     double price;
     bool isActive;
+    int quantityStock;
 public:
-    Product(string _productId, string _name, double _price, bool _isActive, string _description = "")
-        : productId(_productId), name(_name), price(_price), isActive(_isActive), description(_description) {}
-
-    string getProductId() { return productId; }
-    string getName() { return name; }
-    double getPrice() { return price; }
-    bool getIsActive() { return isActive; }
-
-    void displayInfo() {
+    Product(string _productId, string _name, double _price, bool _isActive, string _description = "", int _quantityStock = 0)
+    : productId(_productId), name(_name), price(_price), isActive(_isActive), description(_description), quantityStock(_quantityStock) {}
+    
+    string getProductId() const { return productId; }
+    string getName() const { return name; }
+    double getPrice() const { return price; }
+    bool getIsActive() const { return isActive; }
+    int getQuantityStock() const { return quantityStock; }
+    
+    void displayInfo() const {
         cout << "Product ID: " << productId << endl;
         cout << "Name: " << name << endl;
         cout << "Price: " << price << " VND" << endl;
         cout << "Description: " << description << endl;
-        cout << "Status: " << (isActive ? "Available" : "Unavailable") << endl;
+        cout << "Stock: " << quantityStock << " | Status: " << (isActive ? "Available" : "Unavailable") << endl;
     }
 };
 
@@ -99,106 +111,159 @@ private:
     string currentOrderStatus;
 public:
     Customer() { loyaltyPoints = 0; role = "customer"; }
-
+    
     bool registerAccount(string _name, string _email, string _phone, string _password, string _role) override {
         if (_name.empty() || _email.empty() || _phone.empty() || _password.empty() || _role.empty()) {
             cout << "Registration failed: missing information.\n";
             return false;
         }
-        userId = "U" + to_string(rand() % 10000 + 1000);
-        name = _name; email = _email; phone = _phone;
-        passwordHash = _password; role = _role;
-        status = "active"; createdAt = time(nullptr); lastLoginAt = createdAt;
+        srand(time(0));
+        userId = "C" + to_string(rand() % 10000 + 1000);
+        name = _name;
+        email = _email;
+        phone = _phone;
+        passwordHash = _password;
+        role = _role;
+        status = "active";
+        createdAt = time(nullptr);
+        lastLoginAt = createdAt;
         cout << "Registered successfully! UserID: " << userId << endl;
         return true;
     }
-
+    
     void login(string identifier, string password) override {
         if ((identifier == email || identifier == phone) && password == passwordHash) {
             lastLoginAt = time(nullptr);
             cout << "Login successful! Welcome back, " << name << endl;
         } else cout << "Invalid login credentials.\n";
     }
-
+    
     void updateAddress(string _address) {
         address = _address;
         cout << "Address updated: " << address << endl;
     }
-
+    
     void earnPoints(int p) {
         loyaltyPoints += p;
         cout << "Earned " << p << " points. Total: " << loyaltyPoints << endl;
     }
-
+    
     void redeemPoints(int p) {
         if (p <= loyaltyPoints) {
             loyaltyPoints -= p;
             cout << "Redeemed " << p << " points. Remaining: " << loyaltyPoints << endl;
         } else cout << "Not enough points.\n";
     }
-
-    void addToCart(Product p, int q) {
-        if (q <= 0) return;
+    
+    void addToCart(const vector<Product>& availableProducts, string productName, int quantity) {
+        if (quantity <= 0) {
+            cout << "Invalid quantity.\n";
+            return;
+        }
+        
+        const Product* productToAdd = nullptr;
+        for (const auto& p : availableProducts) {
+            if (p.getName() == productName) {
+                productToAdd = &p;
+                break;
+            }
+        }
+        
+        if (productToAdd == nullptr) {
+            cout << "Product '" << productName << "' not found in the catalog. Cannot add to cart.\n";
+            return;
+        }
+        
+        // KIỂM TRA 1: Trạng thái và tồn kho bằng 0
+        if (!productToAdd->getIsActive() || productToAdd->getQuantityStock() == 0) {
+            cout << "Product '" << productName << "' is currently unavailable (Out of Stock).\n";
+            return;
+        }
+        
+        int currentCartQuantity = 0;
+        for (const auto &item : cart) {
+            if (item.first.getProductId() == productToAdd->getProductId()) {
+                currentCartQuantity = item.second;
+                break;
+            }
+        }
+        
+        // KIỂM TRA 2: Tổng số lượng vượt quá tồn kho còn lại
+        if (currentCartQuantity + quantity > productToAdd->getQuantityStock()) {
+            cout << "Cannot add " << quantity << " of " << productName
+            << ". Only " << productToAdd->getQuantityStock() - currentCartQuantity << " remaining in stock.\n";
+            return;
+        }
+        
         for (auto &item : cart) {
-            if (item.first.getProductId() == p.getProductId()) {
-                item.second += q;
-                cout << "Updated quantity for " << p.getName() << " to " << item.second << endl;
+            if (item.first.getProductId() == productToAdd->getProductId()) {
+                item.second += quantity;
+                cout << "Updated quantity for " << productToAdd->getName() << " to " << item.second << endl;
                 return;
             }
         }
-        cart.push_back({p, q});
-        cout << "Added " << q << " x " << p.getName() << " to cart.\n";
+        
+        cart.push_back({*productToAdd, quantity});
+        cout << "Added " << quantity << " x " << productToAdd->getName() << " to cart. \n";
     }
-
-    void removeFromCart(string id) {
+    
+    void removeFromCart(string productName) {
         for (auto it = cart.begin(); it != cart.end(); ++it) {
-            if (it->first.getProductId() == id) {
+            if (it->first.getName() == productName) {
                 cout << "Removed " << it->first.getName() << " from cart.\n";
                 cart.erase(it);
                 return;
             }
         }
-        cout << "Product not found in cart.\n";
+        cout << "Product '" << productName << "' not found in cart.\n";
     }
-
-    void viewCart() {
+    
+    void viewCart() const {
         if (cart.empty()) { cout << "Your cart is empty.\n"; return; }
         double total = 0;
         cout << "\n--- Your Cart ---\n";
-        for (auto item : cart) {
+        for (const auto& item : cart) {
             double sub = item.first.getPrice() * item.second;
             total += sub;
             cout << item.first.getName() << " x " << item.second << " → " << sub << " VND\n";
         }
         cout << "Total: " << total << " VND\n";
     }
-
+    
     void placeOrder(bool delivery) {
         if (cart.empty()) { cout << "Cart empty.\n"; return; }
+        
+        double orderTotal = 0;
+        for (const auto& item : cart) {
+            orderTotal += item.first.getPrice() * item.second;
+        }
+        
         earnPoints(10);
+        
         cart.clear();
         currentOrderStatus = "Pending";
-        cout << "Order placed! Type: " << (delivery ? "Home Delivery" : "Pickup") << endl;
+        cout << "Order placed! Total: " << orderTotal << " VND. Type: " << (delivery ? "Home Delivery" : "Pickup") << endl;
     }
-
-    void trackOrder() {
+    
+    void trackOrder() const {
         if (currentOrderStatus.empty()) cout << "No order placed.\n";
         else cout << "Current order status: " << currentOrderStatus << endl;
     }
-
-    void browseProducts(vector<Product> products) {
+    
+    void browseProducts(const vector<Product>& products) const {
         cout << "\n--- Product Catalog ---\n";
-        for (auto p : products)
+        for (const auto& p : products)
             if (p.getIsActive()) p.displayInfo();
     }
-
-    void searchProduct(vector<Product> products, string name) {
-        for (auto p : products)
+    
+    void searchProduct(const vector<Product>& products, string name) const {
+        for (const auto& p : products)
             if (p.getName() == name) { p.displayInfo(); return; }
         cout << "No product found.\n";
     }
-
-    void displayInfo() override {
+    
+    void displayInfo() const override {
+        cout<<"Infomation of customer: \n";
         User::displayInfo();
         cout << "Address: " << (address.empty() ? "N/A" : address) << endl;
         cout << "Loyalty Points: " << loyaltyPoints << endl;
@@ -212,33 +277,35 @@ private:
     string sessionId;
 public:
     Guest() {
+        srand(time(0));
         sessionId = "G" + to_string(rand() % 10000 + 1000);
         cout << "Guest session started: " << sessionId << endl;
     }
-
-    void browseProducts(vector<Product> products) {
+    
+    void browseProducts(const vector<Product>& products) const {
         cout << "\n--- Product Catalog (Guest) ---\n";
-        for (auto p : products)
+        for (const auto& p : products)
             if (p.getIsActive()) p.displayInfo();
     }
-
-    void searchProduct(vector<Product> products, string name) {
-        for (auto p : products)
+    
+    void searchProduct(const vector<Product>& products, string name) const {
+        for (const auto& p : products)
             if (p.getName() == name) { p.displayInfo(); return; }
         cout << "No product found.\n";
     }
-
+    
     Customer registerAsCustomer(string name, string email, string phone, string password) {
         Customer newCustomer;
         newCustomer.registerAccount(name, email, phone, password, "customer");
         cout << "Welcome " << name << "! You are now a registered customer.\n";
         return newCustomer;
     }
-
-    void displayInfo() {
+    
+    void displayInfo() const {
         cout << "Guest Session ID: " << sessionId << endl;
     }
 };
+
 
 
 
