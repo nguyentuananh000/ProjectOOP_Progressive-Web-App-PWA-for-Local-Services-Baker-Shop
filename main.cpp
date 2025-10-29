@@ -6,8 +6,6 @@
 #include <utility>
 using namespace std;
 
-class Product;
-
 class User {
 protected:
     string userId;
