@@ -4,7 +4,35 @@
 #include <ctime>
 #include <cstdlib>
 #include <utility>
+
 using namespace std;
+
+struct OrderItem {
+    string productId;
+    string productName;
+    int quantity;
+    double priceAtPurchase;
+
+    OrderItem(string id, string name, int q, double price)
+        : productId(id), productName(name), quantity(q), priceAtPurchase(price) {}
+};
+
+struct Order {
+    string orderId;
+    string customerId;
+    vector<OrderItem> items;
+    double totalAmount;
+    string status;
+    time_t createdAt;
+    time_t updatedAt;
+
+    Order() {
+        totalAmount = 0;
+        status = "pending";
+        createdAt = time(nullptr);
+        updatedAt = createdAt;
+    }
+};
 
 class User {
 protected:
@@ -72,6 +100,7 @@ public:
     
     string getName() const { return name; }
     string getRole() const { return role; }
+    string getUserId() const { return userId; }
 };
 
 class Product {
@@ -99,23 +128,43 @@ public:
         cout << "Description: " << description << endl;
         cout << "Stock: " << quantityStock << " | Status: " << (isActive ? "Available" : "Unavailable") << endl;
     }
+
+    void setPrice(double newPrice) {
+        if (newPrice >= 0) price = newPrice;
+    }
+    void activate() {
+        isActive = true;
+    }
+    void deactivate() {
+        isActive = false;
+    }
+    void setQuantityStock(int newStock) {
+        if (newStock >= 0) quantityStock = newStock;
+    }
+    void setDescription(string newDesc) {
+        description = newDesc;
+    }
 };
 
 class Customer : public User {
 private:
     string address;
     int loyaltyPoints;
-    vector<pair<Product, int>> cart;
-    string currentOrderStatus;
+    vector<pair<string, int>> cart;
+
 public:
-    Customer() { loyaltyPoints = 0; role = "customer"; }
+    Customer() {
+        address = "";
+        loyaltyPoints = 0;
+        status = "active";
+        role = "customer";
+    }
     
     bool registerAccount(string _name, string _email, string _phone, string _password, string _role) override {
         if (_name.empty() || _email.empty() || _phone.empty() || _password.empty() || _role.empty()) {
-            cout << "Registration failed: missing information.\n";
+            cout << "[Customer] Registration failed: missing information.\n";
             return false;
         }
-        srand(time(0));
         userId = "C" + to_string(rand() % 10000 + 1000);
         name = _name;
         email = _email;
@@ -125,15 +174,15 @@ public:
         status = "active";
         createdAt = time(nullptr);
         lastLoginAt = createdAt;
-        cout << "Registered successfully! UserID: " << userId << endl;
+        cout << "[Customer] Registered successfully! UserID: " << userId << endl;
         return true;
     }
     
     void login(string identifier, string password) override {
         if ((identifier == email || identifier == phone) && password == passwordHash) {
             lastLoginAt = time(nullptr);
-            cout << "Login successful! Welcome back, " << name << endl;
-        } else cout << "Invalid login credentials.\n";
+            cout << "[Customer] Login successful! Welcome back, " << name << endl;
+        } else cout << "[Customer] Invalid login credentials.\n";
     }
     
     void updateAddress(string _address) {
@@ -172,7 +221,6 @@ public:
             return;
         }
         
-        // KIỂM TRA 1: Trạng thái và tồn kho bằng 0
         if (!productToAdd->getIsActive() || productToAdd->getQuantityStock() == 0) {
             cout << "Product '" << productName << "' is currently unavailable (Out of Stock).\n";
             return;
@@ -180,13 +228,12 @@ public:
         
         int currentCartQuantity = 0;
         for (const auto &item : cart) {
-            if (item.first.getProductId() == productToAdd->getProductId()) {
+            if (item.first == productToAdd->getProductId()) {
                 currentCartQuantity = item.second;
                 break;
             }
         }
         
-        // KIỂM TRA 2: Tổng số lượng vượt quá tồn kho còn lại
         if (currentCartQuantity + quantity > productToAdd->getQuantityStock()) {
             cout << "Cannot add " << quantity << " of " << productName
             << ". Only " << productToAdd->getQuantityStock() - currentCartQuantity << " remaining in stock.\n";
@@ -194,21 +241,29 @@ public:
         }
         
         for (auto &item : cart) {
-            if (item.first.getProductId() == productToAdd->getProductId()) {
+            if (item.first == productToAdd->getProductId()) {
                 item.second += quantity;
                 cout << "Updated quantity for " << productToAdd->getName() << " to " << item.second << endl;
                 return;
             }
         }
         
-        cart.push_back({*productToAdd, quantity});
+        cart.push_back({productToAdd->getProductId(), quantity});
         cout << "Added " << quantity << " x " << productToAdd->getName() << " to cart. \n";
     }
     
-    void removeFromCart(string productName) {
+    void removeFromCart(const vector<Product>& availableProducts, string productName) {
+        string productIdToRemove = "";
+        for(const auto& p : availableProducts) {
+            if(p.getName() == productName) {
+                productIdToRemove = p.getProductId();
+                break;
+            }
+        }
+
         for (auto it = cart.begin(); it != cart.end(); ++it) {
-            if (it->first.getName() == productName) {
-                cout << "Removed " << it->first.getName() << " from cart.\n";
+            if (it->first == productIdToRemove) {
+                cout << "Removed " << productName << " from cart.\n";
                 cart.erase(it);
                 return;
             }
@@ -216,36 +271,69 @@ public:
         cout << "Product '" << productName << "' not found in cart.\n";
     }
     
-    void viewCart() const {
+    void viewCart(const vector<Product>& availableProducts) const {
         if (cart.empty()) { cout << "Your cart is empty.\n"; return; }
         double total = 0;
         cout << "\n--- Your Cart ---\n";
+        
         for (const auto& item : cart) {
-            double sub = item.first.getPrice() * item.second;
-            total += sub;
-            cout << item.first.getName() << " x " << item.second << " → " << sub << " VND\n";
+            const Product* p = nullptr;
+            for(const auto& prod : availableProducts) {
+                if(prod.getProductId() == item.first) {
+                    p = &prod;
+                    break;
+                }
+            }
+
+            if(p) {
+                double sub = p->getPrice() * item.second;
+                total += sub;
+                cout << p->getName() << " x " << item.second << " -> " << sub << " VND\n";
+            }
         }
         cout << "Total: " << total << " VND\n";
     }
     
-    void placeOrder(bool delivery) {
+    void placeOrder(vector<Order>& allOrders, const vector<Product>& availableProducts, bool delivery) {
         if (cart.empty()) { cout << "Cart empty.\n"; return; }
         
-        double orderTotal = 0;
-        for (const auto& item : cart) {
-            orderTotal += item.first.getPrice() * item.second;
+        Order newOrder;
+        newOrder.orderId = "O" + to_string(rand() % 10000 + 1000);
+        newOrder.customerId = this->userId;
+
+        for (const auto& cartItem : cart) {
+            const Product* p = nullptr;
+            for(const auto& prod : availableProducts) {
+                if(prod.getProductId() == cartItem.first) {
+                    p = &prod;
+                    break;
+                }
+            }
+
+            if(p) {
+                double price = p->getPrice();
+                int qty = cartItem.second;
+                newOrder.items.push_back(OrderItem(p->getProductId(), p->getName(), qty, price));
+                newOrder.totalAmount += price * qty;
+            }
         }
+
+        allOrders.push_back(newOrder);
         
         earnPoints(10);
-        
         cart.clear();
-        currentOrderStatus = "Pending";
-        cout << "Order placed! Total: " << orderTotal << " VND. Type: " << (delivery ? "Home Delivery" : "Pickup") << endl;
+        
+        cout << "Order placed! ID: " << newOrder.orderId << ". Total: " << newOrder.totalAmount << " VND.\n";
     }
     
-    void trackOrder() const {
-        if (currentOrderStatus.empty()) cout << "No order placed.\n";
-        else cout << "Current order status: " << currentOrderStatus << endl;
+    void trackOrder(const vector<Order>& allOrders) const {
+        for (auto it = allOrders.rbegin(); it != allOrders.rend(); ++it) {
+            if (it->customerId == this->userId) {
+                cout << "Tracking Order " << it->orderId << ": Status is " << it->status << endl;
+                return;
+            }
+        }
+        cout << "No order found for this user.\n";
     }
     
     void browseProducts(const vector<Product>& products) const {
@@ -265,7 +353,6 @@ public:
         User::displayInfo();
         cout << "Address: " << (address.empty() ? "N/A" : address) << endl;
         cout << "Loyalty Points: " << loyaltyPoints << endl;
-        cout << "Current Order: " << (currentOrderStatus.empty() ? "None" : currentOrderStatus) << endl;
         cout << "Cart Items: " << cart.size() << endl;
     }
 };
@@ -275,7 +362,6 @@ private:
     string sessionId;
 public:
     Guest() {
-        srand(time(0));
         sessionId = "G" + to_string(rand() % 10000 + 1000);
         cout << "Guest session started: " << sessionId << endl;
     }
@@ -304,6 +390,249 @@ public:
     }
 };
 
+class Admin : public User {
+private:
+    vector<string>   promotion;
+public:
+    Admin() {
+        role = "admin";
+        status = "active";
+    }
+
+    bool registerAccount(string _name, string _email, string _phone, string _password, string _role) override {
+        userId = "A" + to_string(rand() % 10000 + 1000);
+        name = _name;
+        email = _email;
+        phone = _phone;
+        passwordHash = _password;
+        role = "admin";
+        status = "active";
+        createdAt = time(nullptr);
+        lastLoginAt = createdAt;
+        cout << "Registered successfully! UserID: " << userId << endl;
+        return true;
+    }
+
+    void login(string identifier, string password) override {
+        if ((identifier == email || identifier == userId) && password == passwordHash) {
+            lastLoginAt = time(nullptr);
+            cout << "[ADMIN] Login successful! Welcome, " << name << endl;
+        } else {
+            cout << "[ADMIN] Invalid login credentials.\n";
+        }
+    }
+
+    void createProduct(vector<Product>& products, string _productId, string _name, double _price, bool _isActive, string _description = "", int _quantityStock = 0) {
+        
+        for (const auto& p : products) {
+            if (p.getProductId() == _productId) {
+                cout << "[ADMIN] Duplicate productId.\n";
+                return;
+            }
+        }
+        
+        Product pNew(_productId, _name, _price, _isActive, _description, _quantityStock);
+        products.push_back(pNew);
+        cout << "[ADMIN] Product created: " << _name << "\n";
+    }
+
+    void updateProduct(vector<Product>& products, string productId, double newPrice, int newStock, bool newStatus, string newDesc) {
+        for (auto& p : products) {
+            if (p.getProductId() == productId) {
+                if (newPrice > 0) p.setPrice(newPrice);
+                if (newStock >= 0) p.setQuantityStock(newStock);
+                if (!newDesc.empty()) p.setDescription(newDesc);
+                newStatus ? p.activate() : p.deactivate();
+                
+                cout << "[ADMIN] Product " << productId << " updated.\n";
+                return;
+            }
+        }
+        cout << "[ADMIN] Product not found.\n";
+    }
+
+    void deleteProduct(vector<Product>& products, string productId) {
+        for (auto& p : products) {
+            if (p.getProductId() == productId) {
+                p.deactivate();
+                cout << "[ADMIN] Product " << productId << " deactivated (soft-delete).\n";
+                return;
+            }
+        }
+        cout << "[ADMIN] Product not found.\n";
+    }
+
+    void hardDeleteProduct(vector<Product>& products, string productId) {
+        for (auto it = products.begin(); it != products.end(); ++it) {
+            if (it->getProductId() == productId) {
+                products.erase(it);
+                cout << "[ADMIN] Product " << productId << " permanently deleted.\n";
+                return;
+            }
+        }
+        cout << "[ADMIN] Product not found.\n";
+    }
+    
+    void confirmOrder(vector<Order>& allOrders, string orderId) {
+        for (auto& order : allOrders) {
+            if (order.orderId == orderId && order.status == "pending") {
+                order.status = "confirmed";
+                order.updatedAt = time(nullptr);
+                cout << "[ADMIN] Order " << orderId << " confirmed.\n";
+                return;
+            }
+        }
+        cout << "[ADMIN] Could not confirm order " << orderId << " (Not found or not pending).\n";
+    }
+
+    void managePromotions(string promo) {
+        promotion.push_back(promo);
+        cout << "Promotion added: " << promo << "\n";
+    }
+    
+    void viewAllProducts(const vector<Product>& products) const {
+        cout << "\n--- All Products (Admin View) ---\n";
+        for (const auto& p : products) {
+            p.displayInfo();
+        }
+        cout << '\n';
+    }
+    
+    void displayInfo() const override {
+        cout << "Infomation of admin: \n";
+        User::displayInfo();
+        cout << "Active Promotions: " << promotion.size() << endl;
+    }
+};
+
+class Staff : public User {
+private:
+    string currentOrderId;
+    string workStatus;
+
+public:
+    Staff() {
+        role = "staff";
+        currentOrderId = "";
+        workStatus = "idle";
+        status = "active";
+    }
+
+    bool registerAccount(string _name, string _email, string _phone, string _password, string _role) override {
+        userId = "S" + to_string(rand() % 1000 + 100);
+        name = _name;
+        email = _email;
+        phone = _phone;
+        passwordHash = _password;
+        role = "staff";
+        status = "active";
+        createdAt = time(nullptr);
+        lastLoginAt = createdAt;
+        cout << "Registered successfully! UserID: " << userId << endl;
+        return true;
+    }
+
+    void login(string identifier, string password) override {
+        if ((identifier == email || identifier == userId) && password == passwordHash) {
+            lastLoginAt = time(nullptr);
+            cout << "[STAFF] Login successful! Welcome, " << name << endl;
+        } else {
+            cout << "[STAFF] Invalid login credentials.\n";
+        }
+    }
+    
+    void displayInfo() const override {
+        cout << "Infomation of staff: \n";
+        User::displayInfo();
+        cout << "Work Status: " << workStatus << endl;
+        cout << "Handling Order: " << (currentOrderId.empty() ? "None" : currentOrderId) << endl;
+    }
+
+    void claimOrder(vector<Order>& orders, string orderId) {
+        if(workStatus == "working") {
+            cout << "[STAFF] Cannot claim new order, already working on " << currentOrderId << endl;
+            return;
+        }
+        for (auto& order : orders) {
+            if (order.orderId == orderId) {
+                if (order.status != "confirmed") {
+                    cout << "[STAFF] Order must be 'confirmed' to claim. Current status: " << order.status << "\n";
+                    return;
+                }
+                currentOrderId = orderId;
+                workStatus = "working";
+                cout << "[STAFF] Order " << orderId << " claimed successfully.\n";
+                return;
+            }
+        }
+        cout << "[STAFF] Order not found.\n";
+    }
+
+    void updateOrderStatus(vector<Order>& orders, string newStatus) {
+        if (currentOrderId.empty()) {
+            cout << "[STAFF] No current order claimed.\n";
+            return;
+        }
+        
+        for (auto& order : orders) {
+            if (order.orderId == currentOrderId) {
+                string old = order.status;
+
+                if (newStatus == "completed") {
+                    cout << "[STAFF] Use markOrderCompleted() after 'finished'.\n";
+                    return;
+                }
+
+                if (old == "confirmed" && newStatus == "in_progress") {
+                    order.status = "in_progress";
+                    order.updatedAt = time(nullptr);
+                    cout << "[STAFF] Order " << currentOrderId << " -> in_progress\n";
+                    return;
+                }
+                if (old == "in_progress" && newStatus == "finished") {
+                    order.status = "finished";
+                    order.updatedAt = time(nullptr);
+                    cout << "[STAFF] Order " << currentOrderId << " -> finished\n";
+                    return;
+                }
+
+                cout << "[STAFF] Invalid status transition: " << old << " -> " << newStatus << "\n";
+                return;
+            }
+        }
+        cout << "[STAFF] Current order not found.\n";
+    }
+
+    void markOrderCompleted(vector<Order>& orders) {
+        if (currentOrderId.empty()) {
+            cout << "[STAFF] No current order claimed.\n";
+            return;
+        }
+        for (auto& order : orders) {
+            if (order.orderId == currentOrderId) {
+                if (order.status == "finished") {
+                    order.status = "completed";
+                    order.updatedAt = time(nullptr);
+                    cout << "[STAFF] Order " << currentOrderId << " marked as completed.\n";
+                    
+                    currentOrderId = "";
+                    workStatus = "idle";
+                    return;
+                } else {
+                    cout << "[STAFF] Order not in 'finished' state.\n";
+                    return;
+                }
+            }
+        }
+        cout << "[STAFF] Current order not found.\n";
+    }
+
+    void viewWorkStatus() const {
+        cout << "[STAFF] Work: " << workStatus;
+        if (!currentOrderId.empty()) cout << " | Current order: " << currentOrderId;
+        cout << "\n";
+    }
+};
 
 
 
@@ -875,265 +1204,7 @@ public:
     bool getIsAvailable() const { return isAvailable; }
     void setAvailable(bool status) { isAvailable = status; }
 };
-//------------------- Admin kế thừa từ User ------------------------//
-class Admin : public User {
-private:
-    vector<Product*>* product { NULL }; // danh sách sản phẩm (dùng chung)
-    vector<User*>*    user    { NULL }; // (để dành nếu muốn quản lý tài khoản)
-    vector<string>    promotion;        // danh sách mã khuyến mãi
 
-public:
-    Admin(vector<Product*>* p = NULL, vector<User*>* u = NULL) {
-        product = p;
-        user = u;
-        role = "admin"; // thể hiện kế thừa từ User
-    }
-
-    void setProductList(vector<Product*>* p) { product = p; }
-    void setUserList(vector<User*>* u) { user = u; }
-
-    // 1) Tạo sản phẩm mới
-    void createProduct(string _productId, string _sku, string _name, string _description,
-                       double _price, string _imageUrl, bool _isActive,
-                       int _prepTime, string _categoryId) {
-        if (!product) {
-            cout << "[ADMIN] Product list not initialized.\n";
-            return;
-        }
-        // tránh trùng ID
-        for (int i = 0; i < (int)product->size(); i++) {
-            if ((*product)[i]->getProductId() == _productId) {
-                cout << "[ADMIN] Duplicate productId.\n";
-                return;
-            }
-        }
-        Product* pNew = new Product(_productId,_sku,_name,_description,_price,_imageUrl,_isActive,_prepTime,_categoryId);
-        product->push_back(pNew);
-        cout << "[ADMIN] Product created: " << _name << "\n";
-    }
-
-    // 2) Cập nhật sản phẩm (giá, category, kích hoạt/ngưng bán)
-    void updateProduct(string productId, double newPrice, string newCategoryId, bool activate) {
-        if (!product) {
-            cout << "[ADMIN] Product list not initialized.\n";
-            return;
-        }
-        for (int i = 0; i < (int)product->size(); i++) {
-            Product* p = (*product)[i];
-            if (p->getProductId() == productId) {
-                if (newPrice > 0) p->setPrice(newPrice);
-                if (newCategoryId != "") p->assignCategory(newCategoryId);
-                if (activate) p->activate(); else p->deactivate();
-                cout << "[ADMIN] Product " << productId << " updated.\n";
-                return;
-            }
-        }
-        cout << "[ADMIN] Product not found.\n";
-    }
-
-    // 3) XÓA MỀM sản phẩm (giữ lịch sử)
-    void deleteProduct(string productId) {
-        if (!product) {
-            cout << "[ADMIN] Product list not initialized.\n";
-            return;
-        }
-        for (int i = 0; i < (int)product->size(); i++) {
-            Product* p = (*product)[i];
-            if (p->getProductId() == productId) {
-                p->deactivate();
-                cout << "[ADMIN] Product " << productId << " deactivated (soft-delete).\n";
-                return;
-            }
-        }
-        cout << "[ADMIN] Product not found.\n";
-    }
-
-    // (tuỳ chọn) XÓA CỨNG sản phẩm — chỉ dùng khi thực sự muốn gỡ khỏi bộ nhớ
-    void hardDeleteProduct(string productId) {
-        if (!product) { cout << "[ADMIN] Product list not initialized.\n"; return; }
-        for (int i = 0; i < (int)product->size(); i++) {
-            if ((*product)[i]->getProductId() == productId) {
-                delete (*product)[i];
-                product->erase(product->begin() + i);
-                cout << "[ADMIN] Product " << productId << " permanently deleted.\n";
-                return;
-            }
-        }
-        cout << "[ADMIN] Product not found.\n";
-    }
-
-    // 4) Thêm mã khuyến mãi
-    void managePromotions(string promo) {
-        promotion.push_back(promo);
-        cout << "[ADMIN] Promotion added: " << promo << "\n";
-    }
-
-    // 5) Áp dụng khuyến mãi
-    void applyPromotion(string promo) {
-        for (int i = 0; i < (int)promotion.size(); i++) {
-            if (promotion[i] == promo) {
-                cout << "[ADMIN] Promotion applied: " << promo << "\n";
-                return;
-            }
-        }
-        cout << "[ADMIN] Promotion not found.\n";
-    }
-
-    // 6) Hết hạn/loại bỏ khuyến mãi
-    void expirePromotion(string promo) {
-        for (int i = 0; i < (int)promotion.size(); i++) {
-            if (promotion[i] == promo) {
-                promotion.erase(promotion.begin() + i);
-                cout << "[ADMIN] Promotion expired: " << promo << "\n";
-                return;
-            }
-        }
-        cout << "[ADMIN] Promotion not found.\n";
-    }
-
-    // 7) (tuỳ chọn) Xem toàn bộ sản phẩm
-    void viewAllProducts() {
-        if (!product) return;
-        cout << "\n--- All Products ---\n";
-        for (int i = 0; i < (int)product->size(); i++) {
-            (*product)[i]->displayInfo();
-        }
-        cout << '\n';
-    }
-};
-// ======================= ORDER (chuẩn hoá trạng thái) =======================
-struct Order {
-    string orderId;
-    string customerId;
-    vector<pair<Product, int> > items; // Sản phẩm và số lượng
-    double totalAmount;
-    string status; // "pending", "confirmed", "in_progress", "finished", "completed"
-    time_t createdAt;
-    time_t updatedAt;
-
-    Order() {
-        totalAmount = 0;
-        status = "pending";
-        createdAt = time(NULL);
-        updatedAt = createdAt;
-    }
-};
-
-// ======================= STAFF (kế thừa User) =======================
-class Staff : public User {
-private:
-    vector<Order>* orders;   // con trỏ đến danh sách đơn hàng
-    string currentOrderId;   // đơn đang xử lý
-    string workStatus;       // "idle", "working"
-
-public:
-    Staff(vector<Order>* o = NULL) {
-        orders = o;
-        role = "staff";
-        currentOrderId = "";
-        workStatus = "idle";
-    }
-
-    void setOrderList(vector<Order>* o) { orders = o; }
-
-    // Nhân viên nhận đơn: chỉ nhận khi đơn "confirmed"
-    void claimOrder(string orderId) {
-        if (!orders) {
-            cout << "[STAFF] Order list not initialized.\n";
-            return;
-        }
-        for (int i = 0; i < (int)orders->size(); i++) {
-            if ((*orders)[i].orderId == orderId) {
-                if ((*orders)[i].status != "confirmed") {
-                    cout << "[STAFF] Order must be 'confirmed' to claim.\n";
-                    return;
-                }
-                currentOrderId = orderId;
-                workStatus = "working";
-                cout << "[STAFF] Order " << orderId << " claimed successfully.\n";
-                return;
-            }
-        }
-        cout << "[STAFF] Order not found.\n";
-    }
-
-    // Cập nhật tiến độ: confirmed -> in_progress -> finished
-    void updateOrderStatus(string newStatus) {
-        if (!orders) {
-            cout << "[STAFF] Order list not initialized.\n";
-            return;
-        }
-        if (currentOrderId == "") {
-            cout << "[STAFF] No current order claimed.\n";
-            return;
-        }
-        for (int i = 0; i < (int)orders->size(); i++) {
-            if ((*orders)[i].orderId == currentOrderId) {
-                string old = (*orders)[i].status;
-
-                // Chặn completed ở đây (để dành cho markOrderCompleted)
-                if (newStatus == "completed") {
-                    cout << "[STAFF] Use markOrderCompleted() after 'finished'.\n";
-                    return;
-                }
-
-                // Chuyển trạng thái hợp lệ
-                if (old == "confirmed" && newStatus == "in_progress") {
-                    (*orders)[i].status = "in_progress";
-                    (*orders)[i].updatedAt = time(NULL);
-                    cout << "[STAFF] Order " << currentOrderId << " -> in_progress\n";
-                    return;
-                }
-                if (old == "in_progress" && newStatus == "finished") {
-                    (*orders)[i].status = "finished";
-                    (*orders)[i].updatedAt = time(NULL);
-                    cout << "[STAFF] Order " << currentOrderId << " -> finished\n";
-                    return;
-                }
-
-                cout << "[STAFF] Invalid status transition: " << old << " -> " << newStatus << "\n";
-                return;
-            }
-        }
-        cout << "[STAFF] Current order not found.\n";
-    }
-
-    // Hoàn tất đơn: chỉ khi đã "finished"
-    void markOrderCompleted() {
-        if (!orders) {
-            cout << "[STAFF] Order list not initialized.\n";
-            return;
-        }
-        if (currentOrderId == "") {
-            cout << "[STAFF] No current order claimed.\n";
-            return;
-        }
-        for (int i = 0; i < (int)orders->size(); i++) {
-            if ((*orders)[i].orderId == currentOrderId) {
-                if ((*orders)[i].status == "finished") {
-                    (*orders)[i].status = "completed";
-                    (*orders)[i].updatedAt = time(NULL);
-                    cout << "[STAFF] Order " << currentOrderId << " marked as completed.\n";
-                    // reset trạng thái staff
-                    currentOrderId = "";
-                    workStatus = "idle";
-                    return;
-                } else {
-                    cout << "[STAFF] Order not in 'finished' state.\n";
-                    return;
-                }
-            }
-        }
-        cout << "[STAFF] Current order not found.\n";
-    }
-
-    // Xem trạng thái làm việc
-    void viewWorkStatus() {
-        cout << "[STAFF] Work: " << workStatus;
-        if (currentOrderId != "") cout << " | Current order: " << currentOrderId;
-        cout << "\n";
-    }
-};
 
 int main() {
     return 0;
